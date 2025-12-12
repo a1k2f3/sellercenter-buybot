@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
   const login = (email: string, password: string) => {
+    localStorage.getItem("storeToken");
     if (email === "admin@store.com" && password === "admin123") {
       setUser(mockUser);
       return true;
