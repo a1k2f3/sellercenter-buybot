@@ -190,8 +190,8 @@ export default function ProductForm({ product, onSave }: Props) {
       images.forEach((img) => formData.append("images", img));
 
       const url = product
-        ? `http://localhost:5000/api/products/${product._id}`
-        : `http://localhost:5000/api/products`;
+        ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/products/${product._id}`
+        : `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/products`;
 
       const res = await fetch(url, {
         method: product ? "PUT" : "POST",
