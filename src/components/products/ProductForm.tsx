@@ -106,7 +106,7 @@ export default function ProductForm({ product, onSave }: Props) {
     const fetchCategories = async () => {
       try {
         const token = localStorage.getItem("storeToken");
-        const res = await fetch("http://localhost:5000/api/categories", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/categories`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
@@ -125,7 +125,7 @@ export default function ProductForm({ product, onSave }: Props) {
     const fetchTags = async () => {
       try {
         const token = localStorage.getItem("storeToken");
-        const res = await fetch("http://localhost:5000/api/tags", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tags`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
