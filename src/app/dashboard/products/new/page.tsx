@@ -1,9 +1,11 @@
 // src/app/(dashboard)/products/new/page.tsx
 "use client";
+import ProductForm from "@/components/products/ProductForm";
 // import { ProductForm } from "@/components/products/ProductForm";
 // import { ProductForm } from "@/components/products/ProductForm";
-import { ProductForm } from "@/components/products/ProductForm";
+// import { ProductForm } from "@/components/products/ProductForm";
 import { useRouter } from "next/navigation";
+// import {ProductForm} from "@/components/products/ProductForm"
 export default function NewProductPage() {
   const router = useRouter();
 
@@ -15,7 +17,8 @@ export default function NewProductPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* <h1 className="text-3xl font-bold">Add New Product</h1> */}
-      <ProductForm onSave={handleSave} />
+      {/* <ProductForm onSave={handleSave} /> */}
+      <ProductForm onSave={handleSave} /> 
     </div>
   );
 }
