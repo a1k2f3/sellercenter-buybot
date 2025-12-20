@@ -106,17 +106,28 @@ export default function ProductForm({ product, onSave }: Props) {
     const fetchCategories = async () => {
       try {
         const token = localStorage.getItem("storeToken");
+        if (!token) {
+          alert("No auth token found. Redirecting to login.");
+          router.push("/login");
+          return;
+        }
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/categories`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("Categories fetch error:", errorText);
+          throw new Error(`Failed to load categories (status ${res.status}): ${errorText.substring(0, 100)}...`);
+        }
         const data = await res.json();
-        setCategories(data?.data || []); // <-- prevent undefined
-      } catch {
-        alert("Failed to load categories");
+        setCategories(data?.data || []);
+      } catch (err: any) {
+        console.error(err);
+        alert(err.message || "Failed to load categories");
       }
     };
     fetchCategories();
-  }, []);
+  }, [router]);
 
   // ----------------------
   // Fetch Tags
@@ -125,17 +136,28 @@ export default function ProductForm({ product, onSave }: Props) {
     const fetchTags = async () => {
       try {
         const token = localStorage.getItem("storeToken");
+        if (!token) {
+          alert("No auth token found. Redirecting to login.");
+          router.push("/login");
+          return;
+        }
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tags`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("Tags fetch error:", errorText);
+          throw new Error(`Failed to load tags (status ${res.status}): ${errorText.substring(0, 100)}...`);
+        }
         const data = await res.json();
-        setTags(data?.data || []); // <-- prevent undefined
-      } catch {
-        alert("Failed to load tags");
+        setTags(data?.data || []);
+      } catch (err: any) {
+        console.error(err);
+        alert(err.message || "Failed to load tags");
       }
     };
     fetchTags();
-  }, []);
+  }, [router]);
 
   // ----------------------
   // Toggle Tag Selection
@@ -168,6 +190,10 @@ export default function ProductForm({ product, onSave }: Props) {
   };
 
   const onSubmit = async (data: FormData) => {
+    if (images.length === 0) {
+      alert("At least one image is required");
+      return;
+    }
     setIsLoading(true);
     try {
       const token = localStorage.getItem("storeToken");
@@ -179,7 +205,7 @@ export default function ProductForm({ product, onSave }: Props) {
       formData.append("name", data.name);
       formData.append("description", data.description || "");
       formData.append("price", data.price.toString());
-      formData.append("currency", "RS");
+      formData.append("currency", "INR"); // Corrected to standard INR for Indian Rupee
       formData.append("stock", data.stock.toString());
       formData.append("status", "active");
       formData.append("sku", data.sku);
@@ -199,14 +225,19 @@ export default function ProductForm({ product, onSave }: Props) {
         body: formData,
       });
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Product submit error:", errorText);
+        throw new Error(`Error ${res.status}: ${errorText.substring(0, 100)}...`);
+      }
 
+      const result = await res.json();
       alert(product ? "Product updated!" : "Product created!");
       onSave?.();
       router.push("/dashboard/products");
     } catch (err: any) {
-      alert(err.message);
+      console.error(err);
+      alert(err.message || "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -276,20 +307,18 @@ export default function ProductForm({ product, onSave }: Props) {
           {tags.map((tag) => {
             const isSelected = selectedTags.includes(tag._id);
             return (
-
-              <Badge>
-  <button
-    type="button"
-    onClick={() => toggleTag(tag._id)}
-    className={`cursor-pointer px-4 py-2 rounded-full transition-transform transform hover:scale-105 ${
-      isSelected ? "text-green shadow-lg" : "border border-gray-300 text-gray-700"
-    }`}
-    style={{ backgroundColor: isSelected ? tag.color : undefined }}
-  >
-    {tag.name}
-  </button>
-</Badge>
-
+              <Badge key={tag._id}>
+                <button
+                  type="button"
+                  onClick={() => toggleTag(tag._id)}
+                  className={`cursor-pointer px-4 py-2 rounded-full transition-transform transform hover:scale-105 ${
+                    isSelected ? "text-white shadow-lg" : "border border-gray-300 text-gray-700"
+                  }`}
+                  style={{ backgroundColor: isSelected ? tag.color : undefined }}
+                >
+                  {tag.name}
+                </button>
+              </Badge>
             );
           })}
         </div>
@@ -297,7 +326,7 @@ export default function ProductForm({ product, onSave }: Props) {
 
       {/* Images */}
       <div>
-        <Label>Images (Max 4)</Label>
+        <Label>Images (Max 4, at least 1 required)</Label>
         <Input type="file" multiple accept="image/*" onChange={handleImageChange} className="mt-2" />
         <div className="grid grid-cols-4 gap-4 mt-4">
           {images.map((img, i) => (
