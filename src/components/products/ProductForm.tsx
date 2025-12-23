@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Upload, X } from "lucide-react"; // Optional icons
 
 // ----------------------
 // Type Definitions
@@ -40,7 +41,7 @@ interface Props {
 }
 
 // ----------------------
-// Form Schema
+// Form Schema (updated price/stock to handle numbers properly)
 // ----------------------
 const schema = z.object({
   name: z.string().min(3, "Product name is required"),
@@ -64,6 +65,9 @@ export default function ProductForm({ product, onSave }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const MAX_IMAGES = 10;
 
   const {
     register,
@@ -92,16 +96,11 @@ export default function ProductForm({ product, onSave }: Props) {
 
   const watchedTags = watch("tags");
 
-  // ----------------------
-  // Sync selected tags with form
-  // ----------------------
   useEffect(() => {
     setSelectedTags(watchedTags || []);
   }, [watchedTags]);
 
-  // ----------------------
-  // Fetch Categories
-  // ----------------------
+  // Fetch Categories & Tags (unchanged)
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -114,11 +113,7 @@ export default function ProductForm({ product, onSave }: Props) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/categories`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("Categories fetch error:", errorText);
-          throw new Error(`Failed to load categories (status ${res.status}): ${errorText.substring(0, 100)}...`);
-        }
+        if (!res.ok) throw new Error("Failed to load categories");
         const data = await res.json();
         setCategories(data?.data || []);
       } catch (err: any) {
@@ -129,9 +124,6 @@ export default function ProductForm({ product, onSave }: Props) {
     fetchCategories();
   }, [router]);
 
-  // ----------------------
-  // Fetch Tags
-  // ----------------------
   useEffect(() => {
     const fetchTags = async () => {
       try {
@@ -144,11 +136,7 @@ export default function ProductForm({ product, onSave }: Props) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/tags`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("Tags fetch error:", errorText);
-          throw new Error(`Failed to load tags (status ${res.status}): ${errorText.substring(0, 100)}...`);
-        }
+        if (!res.ok) throw new Error("Failed to load tags");
         const data = await res.json();
         setTags(data?.data || []);
       } catch (err: any) {
@@ -159,9 +147,6 @@ export default function ProductForm({ product, onSave }: Props) {
     fetchTags();
   }, [router]);
 
-  // ----------------------
-  // Toggle Tag Selection
-  // ----------------------
   const toggleTag = (tagId: string) => {
     const updated = selectedTags.includes(tagId)
       ? selectedTags.filter((t) => t !== tagId)
@@ -172,14 +157,52 @@ export default function ProductForm({ product, onSave }: Props) {
   };
 
   // ----------------------
-  // Image Handler
+  // Image Handling (Drag & Drop + Click)
   // ----------------------
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      if (files.length + images.length > 4) return alert("Max 4 images allowed");
-      setImages((prev) => [...prev, ...files]);
+  const handleFiles = (files: File[]) => {
+    const validFiles = files.filter((file) => file.type.startsWith("image/"));
+    if (validFiles.length === 0) {
+      alert("Please upload only image files");
+      return;
     }
+
+    const newImages = [...images, ...validFiles].slice(0, MAX_IMAGES);
+    if (newImages.length < images.length + validFiles.length) {
+      alert(`Maximum ${MAX_IMAGES} images allowed. Only added up to the limit.`);
+    }
+    setImages(newImages);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(Array.from(e.target.files));
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
   };
 
   // ----------------------
@@ -194,18 +217,18 @@ export default function ProductForm({ product, onSave }: Props) {
       alert("At least one image is required");
       return;
     }
+
     setIsLoading(true);
     try {
       const token = localStorage.getItem("storeToken");
       const storeId = localStorage.getItem("storeId");
-
       if (!token || !storeId) return router.push("/login");
 
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("description", data.description || "");
       formData.append("price", data.price.toString());
-      formData.append("currency", "INR"); // Corrected to standard INR for Indian Rupee
+      formData.append("currency", "INR");
       formData.append("stock", data.stock.toString());
       formData.append("status", "active");
       formData.append("sku", data.sku);
@@ -227,11 +250,9 @@ export default function ProductForm({ product, onSave }: Props) {
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("Product submit error:", errorText);
         throw new Error(`Error ${res.status}: ${errorText.substring(0, 100)}...`);
       }
 
-      const result = await res.json();
       alert(product ? "Product updated!" : "Product created!");
       onSave?.();
       router.push("/dashboard/products");
@@ -307,14 +328,16 @@ export default function ProductForm({ product, onSave }: Props) {
           {tags.map((tag) => {
             const isSelected = selectedTags.includes(tag._id);
             return (
-              <Badge key={tag._id}>
+              <Badge key={tag._id}  >
                 <button
                   type="button"
                   onClick={() => toggleTag(tag._id)}
-                  className={`cursor-pointer px-4 py-2 rounded-full transition-transform transform hover:scale-105 ${
-                    isSelected ? "text-white shadow-lg" : "border border-gray-300 text-gray-700"
+                  className={`px-4 py-2 rounded-full transition-all ${
+                    isSelected
+                      ? "text-white shadow-lg"
+                      : "border border-gray-300 text-gray-700 hover:bg-gray-100"
                   }`}
-                  style={{ backgroundColor: isSelected ? tag.color : undefined }}
+                  style={{ backgroundColor: isSelected ? tag.color || "#3b82f6" : undefined }}
                 >
                   {tag.name}
                 </button>
@@ -324,24 +347,65 @@ export default function ProductForm({ product, onSave }: Props) {
         </div>
       </div>
 
-      {/* Images */}
+      {/* Images - Drag & Drop */}
       <div>
-        <Label>Images (Max 4, at least 1 required)</Label>
-        <Input type="file" multiple accept="image/*" onChange={handleImageChange} className="mt-2" />
-        <div className="grid grid-cols-4 gap-4 mt-4">
-          {images.map((img, i) => (
-            <div key={i} className="relative group">
-              <img src={URL.createObjectURL(img)} alt="" className="w-full h-32 object-cover rounded-xl border" />
-              <button
-                type="button"
-                onClick={() => setImages(images.filter((_, idx) => idx !== i))}
-                className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 text-sm flex items-center justify-center"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+        <Label>Images (Max {MAX_IMAGES}, at least 1 required)</Label>
+
+        <div
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          className={`mt-2 border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+            isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
+          }`}
+        >
+          <Upload className="mx-auto h-12 w-12 text-gray-400" />
+          <p className="mt-4 text-lg text-gray-600">
+            Drag & drop images here, or click to select
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Up to {MAX_IMAGES} images • JPG, PNG, WebP
+          </p>
+
+          <Input
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={handleImageChange}
+            className="mt-6 max-w-xs mx-auto cursor-pointer"
+          />
         </div>
+
+        {/* Image Previews */}
+        {images.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-6">
+            {images.map((img, i) => (
+              <div key={i} className="relative group rounded-xl overflow-hidden border">
+                <img
+                  src={URL.createObjectURL(img)}
+                  alt={`Preview ${i + 1}`}
+                  className="w-full h-40 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs py-1 text-center">
+                  {img.name.substring(0, 15)}...
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {images.length > 0 && (
+          <p className="mt-4 text-sm text-gray-600 text-center">
+            {images.length}/{MAX_IMAGES} images selected
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end gap-4 pt-6 border-t">
