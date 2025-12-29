@@ -326,7 +326,7 @@ export default function ProductForm({ product, onSave }: Props) {
           <p className="text-red-500 text-sm">{errors.price?.message}</p>
         </div>
         <div>
-          <Label>Discount Price (₹)</Label>
+          <Label>Discount Price (RS)</Label>
           <Input type="number" {...register("discountPrice", { valueAsNumber: true })} className="mt-2" placeholder="Optional" />
         </div>
         <div>
