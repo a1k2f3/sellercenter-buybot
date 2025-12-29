@@ -43,7 +43,6 @@ interface Props {
   onSave?: () => void;
 }
 
-// Extended Schema
 const schema = z.object({
   name: z.string().min(3, "Product name is required"),
   description: z.string().optional(),
@@ -104,30 +103,32 @@ export default function ProductForm({ product, onSave }: Props) {
       name: product?.name || "",
       description: product?.description || "",
       price: product?.price || 0,
-      discountPrice: product?.discountPrice || undefined,
+      discountPrice: product?.discountPrice ?? null,
       stock: product?.stock || 0,
       sku: product?.sku || "",
       category: product?.category?._id || "",
       warranty: product?.warranty || "",
-      ageGroup: product?.ageGroup || null,
+      ageGroup: product?.ageGroup ?? null,
       tags: product?.tags?.map((t: any) => t._id) || [],
     },
   });
 
   const watchedTags = watch("tags");
+  const watchedCategory = watch("category");
+  const watchedAgeGroup = watch("ageGroup");
 
-  // Load existing media when editing
+  // Load existing data when editing
   useEffect(() => {
     if (product) {
       setExistingImages(product.images || []);
       setExistingVideos(product.videos || []);
       setSelectedTags(product.tags?.map((t: any) => t._id) || []);
       setSelectedSizes(product.size || []);
-      
-      if (product.specifications && product.specifications.size > 0) {
-        const specsArray = Array.from(product.specifications, ([key, value]) => ({
+
+      if (product.specifications && typeof product.specifications === 'object' && !Array.isArray(product.specifications) && product.specifications !== null) {
+        const specsArray = Object.entries(product.specifications).map(([key, value]) => ({
           key,
-          value,
+          value: String(value),
         }));
         setSpecs(specsArray.length > 0 ? specsArray : [{ key: "", value: "" }]);
       }
@@ -186,7 +187,11 @@ export default function ProductForm({ product, onSave }: Props) {
   };
 
   const addSpecRow = () => setSpecs([...specs, { key: "", value: "" }]);
-  const removeSpecRow = (index: number) => setSpecs(specs.filter((_, i) => i !== index));
+  const removeSpecRow = (index: number) => {
+    if (specs.length > 1) {
+      setSpecs(specs.filter((_, i) => i !== index));
+    }
+  };
   const updateSpec = (index: number, field: "key" | "value", value: string) => {
     const updated = [...specs];
     updated[index][field] = value;
@@ -203,14 +208,14 @@ export default function ProductForm({ product, onSave }: Props) {
       const newImages = [...images, ...valid].slice(0, MAX_IMAGES);
       setImages(newImages);
       if (newImages.length < images.length + valid.length) {
-        alert(`Max ${MAX_IMAGES} images allowed`);
+        alert(`Maximum ${MAX_IMAGES} images allowed`);
       }
     } else {
       const valid = fileArray.filter((f) => f.type.startsWith("video/"));
       const newVideos = [...videos, ...valid].slice(0, MAX_VIDEOS);
       setVideos(newVideos);
       if (newVideos.length < videos.length + valid.length) {
-        alert(`Max ${MAX_VIDEOS} videos allowed`);
+        alert(`Maximum ${MAX_VIDEOS} videos allowed`);
       }
     }
   };
@@ -236,27 +241,27 @@ export default function ProductForm({ product, onSave }: Props) {
       formData.append("name", data.name);
       formData.append("description", data.description || "");
       formData.append("price", data.price.toString());
-      if (data.discountPrice) formData.append("discountPrice", data.discountPrice.toString());
+      if (data.discountPrice != null) {
+        formData.append("discountPrice", data.discountPrice.toString());
+      }
       formData.append("currency", "RS");
       formData.append("stock", data.stock.toString());
       formData.append("status", "draft");
       formData.append("sku", data.sku);
       formData.append("category", data.category);
       formData.append("brand", storeId);
-      if (data.warranty) formData.append("warranty", data.warranty);
+      if (data.warranty?.trim()) formData.append("warranty", data.warranty.trim());
       if (data.ageGroup) formData.append("ageGroup", data.ageGroup);
 
-      // Tags
       selectedTags.forEach((t) => formData.append("tags", t));
-      // Sizes
       selectedSizes.forEach((s) => formData.append("size", s));
-      // Specifications
+
       const validSpecs = specs.filter((s) => s.key.trim() && s.value.trim());
       if (validSpecs.length > 0) {
-        formData.append("specifications", JSON.stringify(Object.fromEntries(validSpecs.map(s => [s.key, s.value]))));
+        const specsObj = Object.fromEntries(validSpecs.map((s) => [s.key.trim(), s.value.trim()]));
+        formData.append("specifications", JSON.stringify(specsObj));
       }
 
-      // Media
       images.forEach((img) => formData.append("images", img));
       videos.forEach((vid) => formData.append("videos", vid));
 
@@ -271,15 +276,16 @@ export default function ProductForm({ product, onSave }: Props) {
       });
 
       if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || "Failed to save product");
+        const errText = await res.text();
+        throw new Error(errText || "Failed to save product");
       }
+      console.log(`Submitting with ${images.length} new + ${existingImages.length} existing images`);
 
       alert(product ? "Product updated successfully!" : "Product created successfully!");
       onSave?.();
       router.push("/dashboard/products");
     } catch (err: any) {
-      console.error(err);
+      console.error("Submit error:", err);
       alert(err.message || "Something went wrong");
     } finally {
       setIsLoading(false);
@@ -330,7 +336,7 @@ export default function ProductForm({ product, onSave }: Props) {
         </div>
         <div>
           <Label>Category *</Label>
-          <Select onValueChange={(v) => setValue("category", v)} defaultValue={watch("category")}>
+          <Select onValueChange={(v) => setValue("category", v)} value={watchedCategory}>
             <SelectTrigger className="mt-2">
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
@@ -352,30 +358,25 @@ export default function ProductForm({ product, onSave }: Props) {
           <Label>Warranty</Label>
           <Input {...register("warranty")} placeholder="e.g., 1 Year Manufacturer Warranty" className="mt-2" />
         </div>
-        {/* Age Group */}
-<div>
-  <Label>Age Group (Optional)</Label>
-  <Select
-    onValueChange={(value) => setValue("ageGroup", value === "none" ? null : value)}
-    value={watch("ageGroup") || "none"} // Show "none" if no ageGroup set
-  >
-    <SelectTrigger className="mt-2">
-      <SelectValue placeholder="Select age group" />
-    </SelectTrigger>
-    <SelectContent>
-      {/* Placeholder option — uses non-empty value "none" to avoid Radix error */}
-      <SelectItem value="none">No specific age group</SelectItem>
-
-      <SelectItem value="Newborn (0-3 months)">Newborn (0-3 months)</SelectItem>
-      <SelectItem value="Infant (3-12 months)">Infant (3-12 months)</SelectItem>
-      <SelectItem value="Toddler (1-3 years)">Toddler (1-3 years)</SelectItem>
-      <SelectItem value="Kids (4-12 years)">Kids (4-12 years)</SelectItem>
-      <SelectItem value="Teen (13-18 years)">Teen (13-18 years)</SelectItem>
-      <SelectItem value="Adult">Adult</SelectItem>
-      <SelectItem value="All Ages">All Ages</SelectItem>
-    </SelectContent>
-  </Select>
-</div>
+        <div>
+          <Label>Age Group (Optional)</Label>
+          <Select
+            onValueChange={(value) => setValue("ageGroup", value === "none" ? null : value)}
+            value={watchedAgeGroup ?? "none"}
+          >
+            <SelectTrigger className="mt-2">
+              <SelectValue placeholder="Select age group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No specific age group</SelectItem>
+              {AGE_GROUPS.map((group) => (
+                <SelectItem key={group} value={group}>
+                  {group}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Tags */}
@@ -445,7 +446,6 @@ export default function ProductForm({ product, onSave }: Props) {
               <Button
                 type="button"
                 variant="destructive"
-                
                 onClick={() => removeSpecRow(i)}
                 disabled={specs.length === 1}
               >
@@ -459,7 +459,7 @@ export default function ProductForm({ product, onSave }: Props) {
         </div>
       </div>
 
-      {/* Images Upload */}
+      {/* Images Upload - FIXED */}
       <div>
         <Label>Product Images (Max {MAX_IMAGES}) *</Label>
         <div
@@ -468,37 +468,53 @@ export default function ProductForm({ product, onSave }: Props) {
             setIsDragging(null);
             handleFiles(e.dataTransfer.files, "images");
           }}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging("images"); }}
-          onDragLeave={() => setIsDragging(null)}
-          className={`mt-3 border-2 border-dashed rounded-xl p-10 text-center transition-colors ${
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging("images");
+          }}
+          onDragLeave={(e) => {
+            e.stopPropagation();
+            setIsDragging(null);
+          }}
+          className={`mt-3 border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer ${
             isDragging === "images" ? "border-blue-500 bg-blue-50" : "border-gray-300"
           }`}
         >
           <Upload className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-4 text-lg">Drop images here or click to upload</p>
-          <Input
+          <p className="mt-4 text-lg font-medium">Drop images here or click to upload</p>
+          <p className="text-sm text-gray-500">JPG, PNG, GIF, WebP • Up to {MAX_IMAGES} images</p>
+
+          {/* Hidden file input */}
+          <input
             type="file"
             multiple
             accept="image/*"
             onChange={(e) => handleFiles(e.target.files, "images")}
-            className="mt-6 max-w-md mx-auto"
+            className="hidden"
+            id="image-upload"
           />
+          {/* Clickable button */}
+          <label
+            htmlFor="image-upload"
+            className="mt-6 inline-block px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition cursor-pointer"
+          >
+            Choose Images
+          </label>
         </div>
 
-        {/* Existing + New Images Preview */}
         {(existingImages.length > 0 || images.length > 0) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4 mt-6">
             {existingImages.map((img) => (
               <div key={img.public_id} className="relative group rounded-xl overflow-hidden border">
-                <img src={img.url} alt="" className="w-full h-40 object-cover" />
+                <img src={img.url} alt="Existing product image" className="w-full h-40 object-cover" />
                 <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                  <Badge >Existing</Badge>
+                  <Badge>Existing</Badge>
                 </div>
               </div>
             ))}
             {images.map((img, i) => (
               <div key={i} className="relative group rounded-xl overflow-hidden border">
-                <img src={URL.createObjectURL(img)} alt="" className="w-full h-40 object-cover" />
+                <img src={URL.createObjectURL(img)} alt="New product image preview" className="w-full h-40 object-cover" />
                 <button
                   type="button"
                   onClick={() => removeNewFile("images", i)}
@@ -512,7 +528,7 @@ export default function ProductForm({ product, onSave }: Props) {
         )}
       </div>
 
-      {/* Videos Upload */}
+      {/* Videos Upload - FIXED */}
       <div>
         <Label>Product Videos (Max {MAX_VIDEOS}, optional)</Label>
         <div
@@ -521,32 +537,43 @@ export default function ProductForm({ product, onSave }: Props) {
             setIsDragging(null);
             handleFiles(e.dataTransfer.files, "videos");
           }}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging("videos"); }}
-          onDragLeave={() => setIsDragging(null)}
-          className={`mt-3 border-2 border-dashed rounded-xl p-10 text-center transition-colors ${
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging("videos");
+          }}
+          onDragLeave={(e) => {
+            e.stopPropagation();
+            setIsDragging(null);
+          }}
+          className={`mt-3 border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer ${
             isDragging === "videos" ? "border-green-500 bg-green-50" : "border-gray-300"
           }`}
         >
           <Upload className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-4 text-lg">Drop videos here or click to upload</p>
-          <p className="text-sm text-gray-500">MP4, WebM, MOV • Max 100MB</p>
-          <Input
+          <p className="mt-4 text-lg font-medium">Drop videos here or click to upload</p>
+          <p className="text-sm text-gray-500">MP4, WebM, MOV • Up to {MAX_VIDEOS} videos • Max 100MB</p>
+
+          <input
             type="file"
+            multiple
             accept="video/*"
             onChange={(e) => handleFiles(e.target.files, "videos")}
-            className="mt-6 max-w-md mx-auto"
+            className="hidden"
+            id="video-upload"
           />
+          <label
+            htmlFor="video-upload"
+            className="mt-6 inline-block px-8 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition cursor-pointer"
+          >
+            Choose Videos
+          </label>
         </div>
 
-        {/* Video Previews */}
         {(existingVideos.length > 0 || videos.length > 0) && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
             {existingVideos.map((vid) => (
               <div key={vid.public_id} className="relative rounded-xl overflow-hidden border bg-gray-50">
                 <video src={vid.url} controls className="w-full h-64 object-cover" />
-                {vid.thumbnail && (
-                  <img src={vid.thumbnail} alt="thumb" className="absolute inset-0 w-full h-full object-cover opacity-30" />
-                )}
                 <Badge className="absolute top-2 left-2">Existing</Badge>
               </div>
             ))}
