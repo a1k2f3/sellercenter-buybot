@@ -246,7 +246,7 @@ export default function ProductForm({ product, onSave }: Props) {
       }
       formData.append("currency", "RS");
       formData.append("stock", data.stock.toString());
-      formData.append("status", "draft");
+      formData.append("status", "active");
       formData.append("sku", data.sku);
       formData.append("category", data.category);
       formData.append("brand", storeId);

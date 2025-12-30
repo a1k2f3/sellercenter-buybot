@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { ColumnDef } from "@tanstack/react-table";
+import { toast } from "sonner"; // Added for Sonner toasts
 
 interface Product {
   id: string;
@@ -18,108 +19,162 @@ interface Product {
   imageUrl?: string;
 }
 
-const columns: ColumnDef<Product>[] = [
-  // Product Image
-  {
-    id: "image",
-    header: "",
-    cell: ({ row }) => {
-      const imageUrl = row.original.imageUrl;
-      return (
-        <div className="relative w-12 h-12 flex-shrink-0">
-          {imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt={row.original.title}
-              width={48}
-              height={48}
-              className="rounded-md object-cover border"
-              unoptimized // Cloudinary images need this
-            />
-          ) : (
-            <div className="w-12 h-12 bg-gray-200 border-2 border-dashed rounded-md" />
-          )}
-        </div>
-      );
-    },
-  },
-
-  // Product Title + SKU
-  {
-    accessorKey: "title",
-    header: "Product",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-3">
-        <div>
-          <p className="font-medium text-base">{row.original.title}</p>
-          {row.original.sku && (
-            <p className="text-sm text-muted-foreground">{row.original.sku}</p>
-          )}
-        </div>
-      </div>
-    ),
-  },
-
-  // Price
-  {
-    accessorKey: "price",
-    header: "Price",
-    cell: ({ row }) => {
-      const price = row.original.price;
-      return <span className="font-semibold">Rs. {price.toLocaleString()}</span>;
-    },
-  },
-
-  // Stock with low stock warning
-  {
-    accessorKey: "stock",
-    header: "Stock",
-    cell: ({ row }) => {
-      const stock = row.original.stock;
-      const isLow = stock < 50;
-      const isOut = stock === 0;
-
-      return (
-        <span
-          className={`font-medium ${
-            isOut
-              ? "text-red-600"
-              : isLow
-              ? "text-orange-600"
-              : "text-green-600"
-          }`}
-        >
-          {stock} {isOut && "(Out of stock)"}
-        </span>
-      );
-    },
-  },
-
-  // Actions
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-1">
-        <Link href={`/dashboard/products/${row.original.id}`}>
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-            <Edit className="h-4 w-4" />
-          </Button>
-        </Link>
-        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    ),
-  },
-];
-
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const columns: ColumnDef<Product>[] = [
+    // Product Image
+    {
+      id: "image",
+      header: "",
+      cell: ({ row }) => {
+        const imageUrl = row.original.imageUrl;
+        return (
+          <div className="relative w-12 h-12 flex-shrink-0">
+            {imageUrl ? (
+              <Image
+                src={imageUrl}
+                alt={row.original.title}
+                width={48}
+                height={48}
+                className="rounded-md object-cover border"
+                unoptimized
+              />
+            ) : (
+              <div className="w-12 h-12 bg-gray-200 border-2 border-dashed rounded-md" />
+            )}
+          </div>
+        );
+      },
+    },
+
+    // Product Title + SKU
+    {
+      accessorKey: "title",
+      header: "Product",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <div>
+            <p className="font-medium text-base">{row.original.title}</p>
+            {row.original.sku && (
+              <p className="text-sm text-muted-foreground">{row.original.sku}</p>
+            )}
+          </div>
+        </div>
+      ),
+    },
+
+    // Price
+    {
+      accessorKey: "price",
+      header: "Price",
+      cell: ({ row }) => {
+        const price = row.original.price;
+        return <span className="font-semibold">Rs. {price.toLocaleString()}</span>;
+      },
+    },
+
+    // Stock with low stock warning
+    {
+      accessorKey: "stock",
+      header: "Stock",
+      cell: ({ row }) => {
+        const stock = row.original.stock;
+        const isLow = stock < 50;
+        const isOut = stock === 0;
+
+        return (
+          <span
+            className={`font-medium ${
+              isOut
+                ? "text-red-600"
+                : isLow
+                ? "text-orange-600"
+                : "text-green-600"
+            }`}
+          >
+            {stock} {isOut && "(Out of stock)"}
+          </span>
+        );
+      },
+    },
+
+    // Actions - Fixed syntax + added Sonner toast
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const product = row.original;
+
+        const handleDelete = () => {
+          toast.error(`Delete "${product.title}"?`, {
+            description: "This action cannot be undone.",
+            duration: 8000,
+            action: {
+              label: "Confirm",
+              onClick: async () => {
+                try {
+                  const token = localStorage.getItem("token");
+
+                  const response = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/products/delete/${product.id}`,
+                    {
+                      method: "DELETE",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+
+                  if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || "Failed to delete product");
+                  }
+
+                  // Remove from UI
+                  setProducts((prev) => prev.filter((p) => p.id !== product.id));
+
+                  toast.success("Product deleted successfully!");
+                } catch (error: any) {
+                  console.error("Delete error:", error);
+                  toast.error("Failed to delete product", {
+                    description: error.message,
+                  });
+                }
+              },
+            },
+            cancel: {
+              label: "Cancel",
+              onClick: () => {},
+            },
+          });
+        };
+
+        return (
+          <div className="flex items-center gap-1">
+            <Link href={`/dashboard/products/${row.original.id}`}>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                <Edit className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={handleDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
   useEffect(() => {
     const fetchProducts = async () => {
-      const storeId=localStorage.getItem("storeId");
+      const storeId = localStorage.getItem("storeId");
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/store/profile?storeId=${storeId}`,
@@ -127,10 +182,9 @@ export default function ProductsPage() {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
-              // Add authorization headers if needed
-              Authorization: `Bearer ${localStorage.getItem("token")}`
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
-            }
+          }
         );
 
         if (!res.ok) throw new Error("Failed to fetch store");
@@ -143,7 +197,7 @@ export default function ProductsPage() {
           sku: p.sku || undefined,
           price: p.price,
           stock: p.stock,
-          imageUrl: p.images?.[0]?.url || undefined, // Correct image path
+          imageUrl: p.images?.[0]?.url || undefined,
         }));
 
         setProducts(formattedProducts);

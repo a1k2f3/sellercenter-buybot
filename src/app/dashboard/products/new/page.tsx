@@ -16,7 +16,7 @@ export default function NewProductPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* <h1 className="text-3xl font-bold">Add New Product</h1> */}
+      {/* <h1 className="text-3xl font-b  old">Add New Product</h1> */}
       {/* <ProductForm onSave={handleSave} /> */}
       <ProductForm onSave={handleSave} /> 
     </div>
