@@ -48,7 +48,7 @@ export function Sidebar() {
     localStorage.removeItem("storeEmail");
 
     // Redirect to login
-    window.location.href = "/login";
+    window.location.href = "/auth/login";
   };
 
   return (

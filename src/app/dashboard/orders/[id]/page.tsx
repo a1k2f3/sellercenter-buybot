@@ -95,6 +95,7 @@ export default function OrderDetailsPage() {
 
         const data = await response.json();
         setOrder(data.order);
+        console.log("Fetched order data:", data.order);
       } catch (err) {
         setError("Network error. Please try again.");
       } finally {
@@ -172,7 +173,7 @@ export default function OrderDetailsPage() {
             <div key={item._id} className="bg-white border border-gray-200 rounded-lg p-6 flex gap-6">
               {/* Product Images */}
               <div className="flex-shrink-0">
-                {item.product.images.length > 0 ? (
+                {item.product?.images?.length > 0 ? (
                   <Image
                     src={item.product.images[0].url}
                     alt="Product"
@@ -189,9 +190,9 @@ export default function OrderDetailsPage() {
 
               {/* Item Details */}
               <div className="flex-grow">
-                <h3 className="text-xl font-semibold">Product ID: {item.product._id.slice(-8).toUpperCase()}</h3>
-                <h3 className="text-xl font-semibold">Product name: {item.product?.name}</h3>
-                {item.product.description && (
+                <h3 className="text-xl font-semibold">Product ID: {item.product?._id?.slice(-8).toUpperCase() || "N/A"}</h3>
+                <h3 className="text-xl font-semibold">Product name: {item.product?.name || "N/A"}</h3>
+                {item.product?.description && (
                   <p className="text-gray-600 mt-2">{item.product.description}</p>
                 )}
                 <div className="mt-4 grid grid-cols-2 gap-4 text-sm">

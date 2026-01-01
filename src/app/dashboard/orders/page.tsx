@@ -48,6 +48,7 @@ export default function OrdersPage() {
         }
 
         const data = await response.json();
+        console.log("Fetched orders data:", data);
         setOrders(data.orders || []);
       } catch (err) {
         setError("Network error. Please check your connection.");
