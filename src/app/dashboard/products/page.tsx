@@ -118,7 +118,7 @@ export default function ProductsPage() {
 
                   const response = await fetch(
                     `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/products/delete/${product.id}`,
-                    {
+                    { 
                       method: "DELETE",
                       headers: {
                         "Content-Type": "application/json",

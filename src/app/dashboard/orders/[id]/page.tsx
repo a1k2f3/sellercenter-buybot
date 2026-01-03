@@ -19,6 +19,7 @@ interface OrderItem {
   _id: string;
   product: Product;
   quantity: number;
+  size:string
   price: number;
   total: number;
 }
@@ -141,7 +142,7 @@ export default function OrderDetailsPage() {
         </div>
         <div className="text-right">
           <p className="text-3xl font-bold text-green-600">
-            ₹{order.storeTotal.toLocaleString("en-IN")}
+            RS{order.storeTotal.toLocaleString("en-IN")}
           </p>
           <p className="text-sm text-gray-500">Your Earnings</p>
         </div>
@@ -203,6 +204,7 @@ export default function OrderDetailsPage() {
                   <div>
                     <span className="text-gray-600">Price per item:</span>
                     <span className="font-bold ml-2">₹{item.price.toLocaleString("en-IN")}</span>
+                    {item.size && <span className="font-bold ml-2">Size: {item.size}</span>}
                   </div>
                 </div>
               </div>

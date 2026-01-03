@@ -46,7 +46,7 @@ export default function OrdersPage() {
           else setError("Failed to load orders.");
           return;
         }
-
+        
         const data = await response.json();
         console.log("Fetched orders data:", data);
         setOrders(data.orders || []);
