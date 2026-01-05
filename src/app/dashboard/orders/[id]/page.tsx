@@ -203,7 +203,7 @@ export default function OrderDetailsPage() {
                   </div>
                   <div>
                     <span className="text-gray-600">Price per item:</span>
-                    <span className="font-bold ml-2">₹{item.price.toLocaleString("en-IN")}</span>
+                    <span className="font-bold ml-2">RS{item.price.toLocaleString("en-IN")}</span>
                     {item.size && <span className="font-bold ml-2">Size: {item.size}</span>}
                   </div>
                 </div>
@@ -211,7 +211,7 @@ export default function OrderDetailsPage() {
 
               {/* Total */}
               <div className="text-right">
-                <p className="text-2xl font-bold">₹{item.total.toLocaleString("en-IN")}</p>
+                <p className="text-2xl font-bold">RS{item.total.toLocaleString("en-IN")}</p>
               </div>
             </div>
           ))}
