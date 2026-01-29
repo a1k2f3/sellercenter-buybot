@@ -84,7 +84,12 @@ export default function ProductForm({ product, onSave }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  
+  // ── Sizes (both types) ────────────────────────────────────────
+  const [selectedLetterSizes, setSelectedLetterSizes] = useState<string[]>([]);
+  const [selectedNumericSizes, setSelectedNumericSizes] = useState<number[]>([]);
+  const [numericSizeInput, setNumericSizeInput] = useState("");
+
   const [specs, setSpecs] = useState<{ key: string; value: string }[]>([{ key: "", value: "" }]);
   const [isDragging, setIsDragging] = useState<"images" | "videos" | null>(null);
 
@@ -123,7 +128,23 @@ export default function ProductForm({ product, onSave }: Props) {
       setExistingImages(product.images || []);
       setExistingVideos(product.videos || []);
       setSelectedTags(product.tags?.map((t: any) => t._id) || []);
-      setSelectedSizes(product.size || []);
+
+      // Split sizes into letter vs numeric
+      const letter: string[] = [];
+      const numeric: number[] = [];
+
+      (product.size || []).forEach((s: string | number) => {
+        const str = String(s).trim();
+        const num = Number(str);
+        if (!isNaN(num) && Number.isInteger(num) && num > 0) {
+          numeric.push(num);
+        } else if (str) {
+          letter.push(str.toUpperCase());
+        }
+      });
+
+      setSelectedLetterSizes(letter);
+      setSelectedNumericSizes(numeric.sort((a, b) => a - b));
 
       if (product.specifications && typeof product.specifications === 'object' && !Array.isArray(product.specifications) && product.specifications !== null) {
         const specsArray = Object.entries(product.specifications).map(([key, value]) => ({
@@ -179,11 +200,33 @@ export default function ProductForm({ product, onSave }: Props) {
     setValue("tags", updated);
   };
 
-  const toggleSize = (size: string) => {
-    const updated = selectedSizes.includes(size)
-      ? selectedSizes.filter((s) => s !== size)
-      : [...selectedSizes, size];
-    setSelectedSizes(updated);
+  // Numeric size helpers
+  const addNumericSize = () => {
+    const val = numericSizeInput.trim();
+    if (!val) return;
+
+    const num = Number(val);
+    if (Number.isInteger(num) && num > 0 && !selectedNumericSizes.includes(num)) {
+      setSelectedNumericSizes((prev) => [...prev, num].sort((a, b) => a - b));
+      setNumericSizeInput("");
+    } else {
+      alert("Please enter a valid positive whole number");
+    }
+  };
+
+  const removeNumericSize = (size: number) => {
+    setSelectedNumericSizes((prev) => prev.filter((s) => s !== size));
+  };
+
+  const toggleLetterSize = (size: string) => {
+    const updated = selectedLetterSizes.includes(size)
+      ? selectedLetterSizes.filter((s) => s !== size)
+      : [...selectedLetterSizes, size];
+    setSelectedLetterSizes(updated);
+  };
+
+  const removeLetterSize = (size: string) => {
+    setSelectedLetterSizes((prev) => prev.filter((s) => s !== size));
   };
 
   const addSpecRow = () => setSpecs([...specs, { key: "", value: "" }]);
@@ -254,7 +297,13 @@ export default function ProductForm({ product, onSave }: Props) {
       if (data.ageGroup) formData.append("ageGroup", data.ageGroup);
 
       selectedTags.forEach((t) => formData.append("tags", t));
-      selectedSizes.forEach((s) => formData.append("size", s));
+
+      // Combine both size types (as strings)
+      const allSizes = [
+        ...selectedLetterSizes,
+        ...selectedNumericSizes.map(String),
+      ];
+      allSizes.forEach((s) => formData.append("size", s));
 
       const validSpecs = specs.filter((s) => s.key.trim() && s.value.trim());
       if (validSpecs.length > 0) {
@@ -279,7 +328,6 @@ export default function ProductForm({ product, onSave }: Props) {
         const errText = await res.text();
         throw new Error(errText || "Failed to save product");
       }
-      console.log(`Submitting with ${images.length} new + ${existingImages.length} existing images`);
 
       alert(product ? "Product updated successfully!" : "Product created successfully!");
       onSave?.();
@@ -318,7 +366,7 @@ export default function ProductForm({ product, onSave }: Props) {
         <Textarea {...register("description")} rows={5} className="mt-2" />
       </div>
 
-      {/* Price & Stock */}
+      {/* Price & Stock & Category */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div>
           <Label>Price (RS) *</Label>
@@ -404,25 +452,100 @@ export default function ProductForm({ product, onSave }: Props) {
         </div>
       </div>
 
-      {/* Sizes */}
-      <div>
+      {/* ── SIZES SECTION ──────────────────────────────────────────────── */}
+      <div className="space-y-6">
         <Label>Available Sizes</Label>
-        <div className="flex flex-wrap gap-3 mt-3">
-          {COMMON_SIZES.map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => toggleSize(size)}
-              className={`px-5 py-3 rounded-lg font-semibold border-2 transition-all ${
-                selectedSizes.includes(size)
-                  ? "bg-black text-white border-black"
-                  : "border-gray-300 hover:bg-gray-100"
-              }`}
-            >
-              {size}
-            </button>
-          ))}
+
+        {/* Letter / standard sizes */}
+        <div>
+          <p className="text-sm text-gray-600 mb-2">Standard / Letter sizes</p>
+          <div className="flex flex-wrap gap-3">
+            {COMMON_SIZES.map((size) => (
+              <button
+                key={size}
+                type="button"
+                onClick={() => toggleLetterSize(size)}
+                className={`px-5 py-3 rounded-lg font-semibold border-2 transition-all ${
+                  selectedLetterSizes.includes(size)
+                    ? "bg-black text-white border-black"
+                    : "border-gray-300 hover:bg-gray-100"
+                }`}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Numeric sizes input + list */}
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600">Numeric sizes (e.g. 36, 38, 40, 28...)</p>
+          
+          <div className="flex gap-3 items-center max-w-md">
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={numericSizeInput}
+              onChange={(e) => setNumericSizeInput(e.target.value)}
+              placeholder="e.g. 38"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addNumericSize();
+                }
+              }}
+              className="flex-1"
+            />
+            <Button type="button" onClick={addNumericSize}>
+              Add
+            </Button>
+          </div>
+
+          {selectedNumericSizes.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {selectedNumericSizes.map((size) => (
+                <div
+                  key={size}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 rounded-full text-sm font-medium"
+                >
+                  {size}
+                  <button
+                    type="button"
+                    onClick={() => removeNumericSize(size)}
+                    className="text-red-600 hover:text-red-800 ml-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Optional: show selected letter sizes as badges too */}
+        {selectedLetterSizes.length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm text-gray-600 mb-2">Selected letter sizes:</p>
+            <div className="flex flex-wrap gap-2">
+              {selectedLetterSizes.map((size) => (
+                <div
+                  key={size}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 rounded-full text-sm font-medium"
+                >
+                  {size}
+                  <button
+                    type="button"
+                    onClick={() => removeLetterSize(size)}
+                    className="text-red-600 hover:text-red-800 ml-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Specifications */}
@@ -459,7 +582,7 @@ export default function ProductForm({ product, onSave }: Props) {
         </div>
       </div>
 
-      {/* Images Upload - FIXED */}
+      {/* Images Upload */}
       <div>
         <Label>Product Images (Max {MAX_IMAGES}) *</Label>
         <div
@@ -484,7 +607,6 @@ export default function ProductForm({ product, onSave }: Props) {
           <p className="mt-4 text-lg font-medium">Drop images here or click to upload</p>
           <p className="text-sm text-gray-500">JPG, PNG, GIF, WebP • Up to {MAX_IMAGES} images</p>
 
-          {/* Hidden file input */}
           <input
             type="file"
             multiple
@@ -493,7 +615,6 @@ export default function ProductForm({ product, onSave }: Props) {
             className="hidden"
             id="image-upload"
           />
-          {/* Clickable button */}
           <label
             htmlFor="image-upload"
             className="mt-6 inline-block px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition cursor-pointer"
@@ -528,7 +649,7 @@ export default function ProductForm({ product, onSave }: Props) {
         )}
       </div>
 
-      {/* Videos Upload - FIXED */}
+      {/* Videos Upload */}
       <div>
         <Label>Product Videos (Max {MAX_VIDEOS}, optional)</Label>
         <div
