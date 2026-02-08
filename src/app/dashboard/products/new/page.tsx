@@ -1,11 +1,9 @@
 // src/app/(dashboard)/products/new/page.tsx
 "use client";
 import ProductForm from "@/components/products/ProductForm";
-// import { ProductForm } from "@/components/products/ProductForm";
-// import { ProductForm } from "@/components/products/ProductForm";
-// import { ProductForm } from "@/components/products/ProductForm";
+
 import { useRouter } from "next/navigation";
-// import {ProductForm} from "@/components/products/ProductForm"
+
 export default function NewProductPage() {
   const router = useRouter();
 

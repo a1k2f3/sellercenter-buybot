@@ -49,7 +49,6 @@ const schema = z.object({
   price: z.number().min(1, "Price must be at least 1"),
   discountPrice: z.number().optional().nullable(),
   stock: z.number().min(0, "Stock cannot be negative"),
-  sku: z.string().min(1, "SKU is required"),
   category: z.string().min(1, "Select a category"),
   warranty: z.string().optional(),
   ageGroup: z.string().nullable().optional(),
@@ -84,8 +83,8 @@ export default function ProductForm({ product, onSave }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  
-  // ── Sizes (both types) ────────────────────────────────────────
+
+  // Sizes
   const [selectedLetterSizes, setSelectedLetterSizes] = useState<string[]>([]);
   const [selectedNumericSizes, setSelectedNumericSizes] = useState<number[]>([]);
   const [numericSizeInput, setNumericSizeInput] = useState("");
@@ -110,7 +109,6 @@ export default function ProductForm({ product, onSave }: Props) {
       price: product?.price || 0,
       discountPrice: product?.discountPrice ?? null,
       stock: product?.stock || 0,
-      sku: product?.sku || "",
       category: product?.category?._id || "",
       warranty: product?.warranty || "",
       ageGroup: product?.ageGroup ?? null,
@@ -118,21 +116,19 @@ export default function ProductForm({ product, onSave }: Props) {
     },
   });
 
-  const watchedTags = watch("tags");
   const watchedCategory = watch("category");
   const watchedAgeGroup = watch("ageGroup");
 
-  // Load existing data when editing
+  // Load existing product data for edit mode
   useEffect(() => {
     if (product) {
       setExistingImages(product.images || []);
       setExistingVideos(product.videos || []);
       setSelectedTags(product.tags?.map((t: any) => t._id) || []);
 
-      // Split sizes into letter vs numeric
+      // Split sizes
       const letter: string[] = [];
       const numeric: number[] = [];
-
       (product.size || []).forEach((s: string | number) => {
         const str = String(s).trim();
         const num = Number(str);
@@ -142,11 +138,16 @@ export default function ProductForm({ product, onSave }: Props) {
           letter.push(str.toUpperCase());
         }
       });
-
       setSelectedLetterSizes(letter);
       setSelectedNumericSizes(numeric.sort((a, b) => a - b));
 
-      if (product.specifications && typeof product.specifications === 'object' && !Array.isArray(product.specifications) && product.specifications !== null) {
+      // Specifications
+      if (
+        product.specifications &&
+        typeof product.specifications === "object" &&
+        !Array.isArray(product.specifications) &&
+        product.specifications !== null
+      ) {
         const specsArray = Object.entries(product.specifications).map(([key, value]) => ({
           key,
           value: String(value),
@@ -155,10 +156,6 @@ export default function ProductForm({ product, onSave }: Props) {
       }
     }
   }, [product]);
-
-  useEffect(() => {
-    setSelectedTags(watchedTags || []);
-  }, [watchedTags]);
 
   // Fetch categories & tags
   useEffect(() => {
@@ -200,11 +197,9 @@ export default function ProductForm({ product, onSave }: Props) {
     setValue("tags", updated);
   };
 
-  // Numeric size helpers
   const addNumericSize = () => {
     const val = numericSizeInput.trim();
     if (!val) return;
-
     const num = Number(val);
     if (Number.isInteger(num) && num > 0 && !selectedNumericSizes.includes(num)) {
       setSelectedNumericSizes((prev) => [...prev, num].sort((a, b) => a - b));
@@ -219,10 +214,9 @@ export default function ProductForm({ product, onSave }: Props) {
   };
 
   const toggleLetterSize = (size: string) => {
-    const updated = selectedLetterSizes.includes(size)
-      ? selectedLetterSizes.filter((s) => s !== size)
-      : [...selectedLetterSizes, size];
-    setSelectedLetterSizes(updated);
+    setSelectedLetterSizes((prev) =>
+      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
+    );
   };
 
   const removeLetterSize = (size: string) => {
@@ -231,9 +225,7 @@ export default function ProductForm({ product, onSave }: Props) {
 
   const addSpecRow = () => setSpecs([...specs, { key: "", value: "" }]);
   const removeSpecRow = (index: number) => {
-    if (specs.length > 1) {
-      setSpecs(specs.filter((_, i) => i !== index));
-    }
+    if (specs.length > 1) setSpecs(specs.filter((_, i) => i !== index));
   };
   const updateSpec = (index: number, field: "key" | "value", value: string) => {
     const updated = [...specs];
@@ -241,7 +233,6 @@ export default function ProductForm({ product, onSave }: Props) {
     setSpecs(updated);
   };
 
-  // Media handling
   const handleFiles = (files: FileList | null, type: "images" | "videos") => {
     if (!files) return;
     const fileArray = Array.from(files);
@@ -290,24 +281,27 @@ export default function ProductForm({ product, onSave }: Props) {
       formData.append("currency", "RS");
       formData.append("stock", data.stock.toString());
       formData.append("status", "active");
-      formData.append("sku", data.sku);
       formData.append("category", data.category);
       formData.append("brand", storeId);
+
       if (data.warranty?.trim()) formData.append("warranty", data.warranty.trim());
       if (data.ageGroup) formData.append("ageGroup", data.ageGroup);
 
       selectedTags.forEach((t) => formData.append("tags", t));
 
-      // Combine both size types (as strings)
+      // Combine sizes
       const allSizes = [
         ...selectedLetterSizes,
         ...selectedNumericSizes.map(String),
       ];
       allSizes.forEach((s) => formData.append("size", s));
 
+      // Specifications
       const validSpecs = specs.filter((s) => s.key.trim() && s.value.trim());
       if (validSpecs.length > 0) {
-        const specsObj = Object.fromEntries(validSpecs.map((s) => [s.key.trim(), s.value.trim()]));
+        const specsObj = Object.fromEntries(
+          validSpecs.map((s) => [s.key.trim(), s.value.trim()])
+        );
         formData.append("specifications", JSON.stringify(specsObj));
       }
 
@@ -345,7 +339,9 @@ export default function ProductForm({ product, onSave }: Props) {
       onSubmit={handleSubmit(onSubmit)}
       className="max-w-6xl mx-auto bg-white p-8 rounded-3xl shadow-2xl space-y-10"
     >
-      <h2 className="text-4xl font-bold text-center">{product ? "Edit Product" : "Add New Product"}</h2>
+      <h2 className="text-4xl font-bold text-center">
+        {product ? "Edit Product" : "Add New Product"}
+      </h2>
 
       {/* Basic Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -354,10 +350,23 @@ export default function ProductForm({ product, onSave }: Props) {
           <Input {...register("name")} className="mt-2" />
           <p className="text-red-500 text-sm">{errors.name?.message}</p>
         </div>
+
         <div>
-          <Label>SKU *</Label>
-          <Input {...register("sku")} className="mt-2" />
-          <p className="text-red-500 text-sm">{errors.sku?.message}</p>
+          <Label>SKU</Label>
+          <Input
+            value={
+              product
+                ? product.sku || "Not set"
+                : "Auto-generated after creation"
+            }
+            disabled
+            className="mt-2 bg-gray-50 cursor-not-allowed"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            {product
+              ? "SKU is automatically set to product ID"
+              : "Unique identifier assigned by the system"}
+          </p>
         </div>
       </div>
 
@@ -366,32 +375,49 @@ export default function ProductForm({ product, onSave }: Props) {
         <Textarea {...register("description")} rows={5} className="mt-2" />
       </div>
 
-      {/* Price & Stock & Category */}
+      {/* Price, Stock, Category */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div>
           <Label>Price (RS) *</Label>
-          <Input type="number" {...register("price", { valueAsNumber: true })} className="mt-2" />
+          <Input
+            type="number"
+            {...register("price", { valueAsNumber: true })}
+            className="mt-2"
+          />
           <p className="text-red-500 text-sm">{errors.price?.message}</p>
         </div>
         <div>
           <Label>Discount Price (RS)</Label>
-          <Input type="number" {...register("discountPrice", { valueAsNumber: true })} className="mt-2" placeholder="Optional" />
+          <Input
+            type="number"
+            {...register("discountPrice", { valueAsNumber: true })}
+            className="mt-2"
+            placeholder="Optional"
+          />
         </div>
         <div>
           <Label>Stock *</Label>
-          <Input type="number" {...register("stock", { valueAsNumber: true })} className="mt-2" />
+          <Input
+            type="number"
+            {...register("stock", { valueAsNumber: true })}
+            className="mt-2"
+          />
           <p className="text-red-500 text-sm">{errors.stock?.message}</p>
         </div>
         <div>
           <Label>Category *</Label>
-          <Select onValueChange={(v) => setValue("category", v)} value={watchedCategory}>
+          <Select
+            onValueChange={(v) => setValue("category", v)}
+            value={watchedCategory}
+          >
             <SelectTrigger className="mt-2">
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
               {categories.map((cat) => (
                 <SelectItem key={cat._id} value={cat._id}>
-                  {cat.name} {cat.parentCategory ? `← ${cat.parentCategory.name}` : ""}
+                  {cat.name}{" "}
+                  {cat.parentCategory ? `← ${cat.parentCategory.name}` : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -404,12 +430,18 @@ export default function ProductForm({ product, onSave }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <Label>Warranty</Label>
-          <Input {...register("warranty")} placeholder="e.g., 1 Year Manufacturer Warranty" className="mt-2" />
+          <Input
+            {...register("warranty")}
+            placeholder="e.g., 1 Year Manufacturer Warranty"
+            className="mt-2"
+          />
         </div>
         <div>
           <Label>Age Group (Optional)</Label>
           <Select
-            onValueChange={(value) => setValue("ageGroup", value === "none" ? null : value)}
+            onValueChange={(value) =>
+              setValue("ageGroup", value === "none" ? null : value)
+            }
             value={watchedAgeGroup ?? "none"}
           >
             <SelectTrigger className="mt-2">
@@ -443,7 +475,9 @@ export default function ProductForm({ product, onSave }: Props) {
                     ? "text-white shadow-lg border-transparent"
                     : "border-gray-300 text-gray-700 hover:bg-gray-50"
                 }`}
-                style={{ backgroundColor: isSelected ? tag.color || "#3b82f6" : undefined }}
+                style={{
+                  backgroundColor: isSelected ? tag.color || "#3b82f6" : undefined,
+                }}
               >
                 {tag.name}
               </button>
@@ -452,11 +486,10 @@ export default function ProductForm({ product, onSave }: Props) {
         </div>
       </div>
 
-      {/* ── SIZES SECTION ──────────────────────────────────────────────── */}
+      {/* Sizes */}
       <div className="space-y-6">
         <Label>Available Sizes</Label>
 
-        {/* Letter / standard sizes */}
         <div>
           <p className="text-sm text-gray-600 mb-2">Standard / Letter sizes</p>
           <div className="flex flex-wrap gap-3">
@@ -477,10 +510,8 @@ export default function ProductForm({ product, onSave }: Props) {
           </div>
         </div>
 
-        {/* Numeric sizes input + list */}
         <div className="space-y-3">
-          <p className="text-sm text-gray-600">Numeric sizes (e.g. 36, 38, 40, 28...)</p>
-          
+          <p className="text-sm text-gray-600">Numeric sizes (e.g. 36, 38, 40...)</p>
           <div className="flex gap-3 items-center max-w-md">
             <Input
               type="number"
@@ -523,7 +554,6 @@ export default function ProductForm({ product, onSave }: Props) {
           )}
         </div>
 
-        {/* Optional: show selected letter sizes as badges too */}
         {selectedLetterSizes.length > 0 && (
           <div className="mt-4">
             <p className="text-sm text-gray-600 mb-2">Selected letter sizes:</p>
@@ -582,7 +612,7 @@ export default function ProductForm({ product, onSave }: Props) {
         </div>
       </div>
 
-      {/* Images Upload */}
+      {/* Images */}
       <div>
         <Label>Product Images (Max {MAX_IMAGES}) *</Label>
         <div
@@ -595,17 +625,14 @@ export default function ProductForm({ product, onSave }: Props) {
             e.preventDefault();
             setIsDragging("images");
           }}
-          onDragLeave={(e) => {
-            e.stopPropagation();
-            setIsDragging(null);
-          }}
+          onDragLeave={() => setIsDragging(null)}
           className={`mt-3 border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer ${
             isDragging === "images" ? "border-blue-500 bg-blue-50" : "border-gray-300"
           }`}
         >
           <Upload className="mx-auto h-12 w-12 text-gray-400" />
           <p className="mt-4 text-lg font-medium">Drop images here or click to upload</p>
-          <p className="text-sm text-gray-500">JPG, PNG, GIF, WebP • Up to {MAX_IMAGES} images</p>
+          <p className="text-sm text-gray-500">JPG, PNG, GIF, WebP</p>
 
           <input
             type="file"
@@ -627,7 +654,7 @@ export default function ProductForm({ product, onSave }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4 mt-6">
             {existingImages.map((img) => (
               <div key={img.public_id} className="relative group rounded-xl overflow-hidden border">
-                <img src={img.url} alt="Existing product image" className="w-full h-40 object-cover" />
+                <img src={img.url} alt="" className="w-full h-40 object-cover" />
                 <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                   <Badge>Existing</Badge>
                 </div>
@@ -635,7 +662,11 @@ export default function ProductForm({ product, onSave }: Props) {
             ))}
             {images.map((img, i) => (
               <div key={i} className="relative group rounded-xl overflow-hidden border">
-                <img src={URL.createObjectURL(img)} alt="New product image preview" className="w-full h-40 object-cover" />
+                <img
+                  src={URL.createObjectURL(img)}
+                  alt="preview"
+                  className="w-full h-40 object-cover"
+                />
                 <button
                   type="button"
                   onClick={() => removeNewFile("images", i)}
@@ -649,7 +680,7 @@ export default function ProductForm({ product, onSave }: Props) {
         )}
       </div>
 
-      {/* Videos Upload */}
+      {/* Videos */}
       <div>
         <Label>Product Videos (Max {MAX_VIDEOS}, optional)</Label>
         <div
@@ -662,17 +693,14 @@ export default function ProductForm({ product, onSave }: Props) {
             e.preventDefault();
             setIsDragging("videos");
           }}
-          onDragLeave={(e) => {
-            e.stopPropagation();
-            setIsDragging(null);
-          }}
+          onDragLeave={() => setIsDragging(null)}
           className={`mt-3 border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer ${
             isDragging === "videos" ? "border-green-500 bg-green-50" : "border-gray-300"
           }`}
         >
           <Upload className="mx-auto h-12 w-12 text-gray-400" />
           <p className="mt-4 text-lg font-medium">Drop videos here or click to upload</p>
-          <p className="text-sm text-gray-500">MP4, WebM, MOV • Up to {MAX_VIDEOS} videos • Max 100MB</p>
+          <p className="text-sm text-gray-500">MP4, WebM, MOV</p>
 
           <input
             type="file"
@@ -700,7 +728,11 @@ export default function ProductForm({ product, onSave }: Props) {
             ))}
             {videos.map((vid, i) => (
               <div key={i} className="relative rounded-xl overflow-hidden border">
-                <video src={URL.createObjectURL(vid)} controls className="w-full h-64 object-cover" />
+                <video
+                  src={URL.createObjectURL(vid)}
+                  controls
+                  className="w-full h-64 object-cover"
+                />
                 <button
                   type="button"
                   onClick={() => removeNewFile("videos", i)}
@@ -714,7 +746,7 @@ export default function ProductForm({ product, onSave }: Props) {
         )}
       </div>
 
-      {/* Submit */}
+      {/* Actions */}
       <div className="flex justify-end gap-4 pt-8 border-t">
         <Button type="button" variant="outline" onClick={() => router.push("/dashboard/products")}>
           Cancel

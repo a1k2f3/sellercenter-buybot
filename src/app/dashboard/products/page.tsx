@@ -8,13 +8,14 @@ import Link from "next/link";
 import { Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { ColumnDef } from "@tanstack/react-table";
-import { toast } from "sonner"; // Added for Sonner toasts
+import { toast } from "sonner";
 
 interface Product {
   id: string;
   title: string;
   sku?: string;
   price: number;
+  discountPrice?: number;     // ← added
   stock: number;
   imageUrl?: string;
 }
@@ -58,30 +59,49 @@ export default function ProductsPage() {
           <div>
             <p className="font-medium text-base">{row.original.title}</p>
             {row.original.sku && (
-              <p className="text-sm text-muted-foreground">{row.original.sku}</p>
+              <p className="text-sm text-muted-foreground">SKU: {row.original.sku}</p>
             )}
           </div>
         </div>
       ),
     },
 
-    // Price
+    // Price (with discount support)
     {
-      accessorKey: "price",
+      id: "price",
       header: "Price",
       cell: ({ row }) => {
-        const price = row.original.price;
-        return <span className="font-semibold">Rs. {price.toLocaleString()}</span>;
+        const { price, discountPrice } = row.original;
+        const hasDiscount = discountPrice !== undefined && discountPrice > 0 && discountPrice < price;
+
+        return (
+          <div className="flex flex-col">
+            {hasDiscount ? (
+              <>
+                <span className="text-sm text-muted-foreground line-through">
+                  Rs. {price.toLocaleString()}
+                </span>
+                <span className="font-semibold text-red-600">
+                  Rs. {discountPrice.toLocaleString()}
+                </span>
+              </>
+            ) : (
+              <span className="font-semibold">
+                Rs. {price.toLocaleString()}
+              </span>
+            )}
+          </div>
+        );
       },
     },
 
-    // Stock with low stock warning
+    // Stock with visual indicators
     {
       accessorKey: "stock",
       header: "Stock",
       cell: ({ row }) => {
         const stock = row.original.stock;
-        const isLow = stock < 50;
+        const isLow = stock > 0 && stock < 50;
         const isOut = stock === 0;
 
         return (
@@ -95,12 +115,13 @@ export default function ProductsPage() {
             }`}
           >
             {stock} {isOut && "(Out of stock)"}
+            {isLow && stock > 0 && " (Low)"}
           </span>
         );
       },
     },
 
-    // Actions - Fixed syntax + added Sonner toast
+    // Actions
     {
       id: "actions",
       cell: ({ row }) => {
@@ -118,7 +139,7 @@ export default function ProductsPage() {
 
                   const response = await fetch(
                     `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/products/delete/${product.id}`,
-                    { 
+                    {
                       method: "DELETE",
                       headers: {
                         "Content-Type": "application/json",
@@ -132,14 +153,12 @@ export default function ProductsPage() {
                     throw new Error(errorData.message || "Failed to delete product");
                   }
 
-                  // Remove from UI
                   setProducts((prev) => prev.filter((p) => p.id !== product.id));
-
                   toast.success("Product deleted successfully!");
                 } catch (error: any) {
                   console.error("Delete error:", error);
                   toast.error("Failed to delete product", {
-                    description: error.message,
+                    description: error.message || "Please try again",
                   });
                 }
               },
@@ -175,6 +194,14 @@ export default function ProductsPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       const storeId = localStorage.getItem("storeId");
+      const token = localStorage.getItem("token");
+
+      if (!storeId || !token) {
+        console.warn("Missing storeId or token");
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/store/profile?storeId=${storeId}`,
@@ -182,20 +209,21 @@ export default function ProductsPage() {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${token}`,
             },
           }
         );
 
-        if (!res.ok) throw new Error("Failed to fetch store");
+        if (!res.ok) throw new Error("Failed to fetch store profile");
 
         const data = await res.json();
-
+console.log("Fetched products:", data.products);
         const formattedProducts: Product[] = (data.products || []).map((p: any) => ({
           id: p._id,
           title: p.name,
           sku: p.sku || undefined,
           price: p.price,
+          discountPrice: p.discountPrice || undefined,     // ← added mapping
           stock: p.stock,
           imageUrl: p.images?.[0]?.url || undefined,
         }));
@@ -231,7 +259,7 @@ export default function ProductsPage() {
       {products.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-xl text-muted-foreground mb-4">
-            No products yet
+            No products added yet
           </p>
           <Link href="/dashboard/products/new">
             <Button>Add your first product</Button>
