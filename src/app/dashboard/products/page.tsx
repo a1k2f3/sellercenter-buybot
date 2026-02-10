@@ -194,7 +194,7 @@ export default function ProductsPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       const storeId = localStorage.getItem("storeId");
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("storeToken");
 
       if (!storeId || !token) {
         console.warn("Missing storeId or token");
