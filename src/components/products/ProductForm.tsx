@@ -45,6 +45,15 @@ interface Props {
 
 const schema = z.object({
   name: z.string().min(3, "Product name is required"),
+  sku: z
+    .string()
+    .min(3, "SKU must be at least 3 characters")
+    .max(32, "SKU is too long")
+    .regex(
+      /^[a-zA-Z0-9\-_]+$/,
+      "SKU can only contain letters, numbers, hyphens and underscores"
+    )
+    .optional(),
   description: z.string().optional(),
   price: z.number().min(1, "Price must be at least 1"),
   discountPrice: z.number().optional().nullable(),
@@ -89,7 +98,9 @@ export default function ProductForm({ product, onSave }: Props) {
   const [selectedNumericSizes, setSelectedNumericSizes] = useState<number[]>([]);
   const [numericSizeInput, setNumericSizeInput] = useState("");
 
-  const [specs, setSpecs] = useState<{ key: string; value: string }[]>([{ key: "", value: "" }]);
+  const [specs, setSpecs] = useState<{ key: string; value: string }[]>([
+    { key: "", value: "" },
+  ]);
   const [isDragging, setIsDragging] = useState<"images" | "videos" | null>(null);
 
   const MAX_IMAGES = 10;
@@ -105,6 +116,7 @@ export default function ProductForm({ product, onSave }: Props) {
     resolver: zodResolver(schema),
     defaultValues: {
       name: product?.name || "",
+      sku: product?.sku || "",
       description: product?.description || "",
       price: product?.price || 0,
       discountPrice: product?.discountPrice ?? null,
@@ -148,11 +160,15 @@ export default function ProductForm({ product, onSave }: Props) {
         !Array.isArray(product.specifications) &&
         product.specifications !== null
       ) {
-        const specsArray = Object.entries(product.specifications).map(([key, value]) => ({
-          key,
-          value: String(value),
-        }));
-        setSpecs(specsArray.length > 0 ? specsArray : [{ key: "", value: "" }]);
+        const specsArray = Object.entries(product.specifications).map(
+          ([key, value]) => ({
+            key,
+            value: String(value),
+          })
+        );
+        setSpecs(
+          specsArray.length > 0 ? specsArray : [{ key: "", value: "" }]
+        );
       }
     }
   }, [product]);
@@ -201,8 +217,14 @@ export default function ProductForm({ product, onSave }: Props) {
     const val = numericSizeInput.trim();
     if (!val) return;
     const num = Number(val);
-    if (Number.isInteger(num) && num > 0 && !selectedNumericSizes.includes(num)) {
-      setSelectedNumericSizes((prev) => [...prev, num].sort((a, b) => a - b));
+    if (
+      Number.isInteger(num) &&
+      num > 0 &&
+      !selectedNumericSizes.includes(num)
+    ) {
+      setSelectedNumericSizes((prev) =>
+        [...prev, num].sort((a, b) => a - b)
+      );
       setNumericSizeInput("");
     } else {
       alert("Please enter a valid positive whole number");
@@ -273,6 +295,12 @@ export default function ProductForm({ product, onSave }: Props) {
 
       const formData = new FormData();
       formData.append("name", data.name);
+
+      // Send SKU only if provided
+      if (data.sku?.trim()) {
+        formData.append("sku", data.sku.trim());
+      }
+
       formData.append("description", data.description || "");
       formData.append("price", data.price.toString());
       if (data.discountPrice != null) {
@@ -352,21 +380,27 @@ export default function ProductForm({ product, onSave }: Props) {
         </div>
 
         <div>
-          <Label>SKU</Label>
+          <Label>
+            SKU {product ? "" : "(optional – leave empty for auto-generation)"}
+          </Label>
           <Input
-            value={
+            {...register("sku")}
+            placeholder={
               product
-                ? product.sku || "Not set"
-                : "Auto-generated after creation"
+                ? `Current: ${product.sku || "—"}`
+                : "e.g. TSHIRT-BLK-M-001"
             }
-            disabled
-            className="mt-2 bg-gray-50 cursor-not-allowed"
+            className="mt-2"
+            disabled={isLoading}
           />
           <p className="text-sm text-gray-500 mt-1">
             {product
-              ? "SKU is automatically set to product ID"
-              : "Unique identifier assigned by the system"}
+              ? "Changing SKU may affect inventory tracking / old orders"
+              : "If left blank, system will generate unique SKU automatically"}
           </p>
+          {errors.sku && (
+            <p className="text-red-500 text-sm mt-1">{errors.sku.message}</p>
+          )}
         </div>
       </div>
 
